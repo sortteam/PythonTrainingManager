@@ -35,6 +35,8 @@ data:
           sleep infinity
         else
           bash -c "$*"
+          tar -zcvf ${JOB_NAME}-model.tar /examples/checkpoints
+          curl -X PUT -T ${JOB_NAME}-model.tar http://ywj-horovod.s3.ap-northeast-2.amazonaws.com/horovod/${JOB_NAME}/model/
      fi
   master.waitWorkerReady: |
     #!/bin/bash

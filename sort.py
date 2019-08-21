@@ -106,7 +106,7 @@ kube_master_ip="203.254.143.253:8080", replicas = 2, namespace = "default", imag
             raise Exception("Entry Point를 입력하세요.")
 
         # Todo train, test data 전송 짜기
-        # TOdo: 일단 S3를 Pulbic Access로 해놨는데 이거 수정하기 ... 제발
+        # TOdo: 일단 S3를 Pulbic Access로 해놨는데 이거 수정하기
 
         # entry_point 전송
         entry_point_file = open(self.entry_point, 'rb')
@@ -119,6 +119,23 @@ kube_master_ip="203.254.143.253:8080", replicas = 2, namespace = "default", imag
             raise Exception("파일 전송 실패")
 
         print(res.status_code)
+
+        # train_data 전송
+        if self.train_data_dir != None:
+            res = requests.put("{s3_url}/horovod/{username}/train_data.npz".format(self.s3_url, self.username), data=self.train_data_dir)
+            if res.status_code != 200:
+                raise Exception("파일 전송 실패")
+
+    def downloeadModelFromS3(self):
+        url = "{s3_url}/horovod/{username}/model/{username}-model.tar".format(s3_url=self.s3_url, username=self.username)
+
+        res = requests.get(url)
+        if res.status_code != 200:
+            raise Exception("모멜 다운로드 실패")
+
+        model_file = res.raw.read()
+        with open("model.tar") as f:
+            f.write(model_file)
 
     def createDefinition(self):
 
@@ -253,6 +270,8 @@ kube_master_ip="203.254.143.253:8080", replicas = 2, namespace = "default", imag
                 if master_job_status.status.active != 1:
                     if master_job_status.status.succeeded == 1:
                         print("학습이 완료되었습니다.")
+                        # 모델 다운로드
+                        self.downloeadModelFromS3()
                     if master_job_status.status.failed == 1:
                         print("학습이 실패했습니다. 로그를 확인해주세요.")
                     break

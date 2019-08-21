@@ -233,7 +233,7 @@ def createStatefulSet(username, replicas, image, is_host_network=False, ssh_port
 
 
 
-def createJob(username, image, replicas, train_mode="cpu", is_host_network = False, ssh_port="22"):
+def createJob(username, image, replicas, train_data=None, test_data=None, train_mode="cpu", is_host_network = False, ssh_port="22"):
     job_name = username + "-horovod"
 
     # TODO: port 번호 수정
@@ -275,7 +275,8 @@ def createJob(username, image, replicas, train_mode="cpu", is_host_network = Fal
         client.V1EnvVar(name="SSHPORT", value=ssh_port),
         client.V1EnvVar(name="USESECRETS", value="true"),
         # TODO: 바꾸기
-        client.V1EnvVar(name="ENTRY_POINT", value="train.py")
+        client.V1EnvVar(name="ENTRY_POINT", value="train.py"),
+        client.V1EnvVar(name="JOB_NAME", value=username)
     ]
     container.ports = [
         client.V1ContainerPort(container_port=int(ssh_port))
@@ -378,6 +379,21 @@ def createJob(username, image, replicas, train_mode="cpu", is_host_network = Fal
                                client.V1VolumeMount(name=job_name + "-data", mount_path="/horovod/data")
                            ])
     ]
+
+    init_args = []
+    # 학습 코드 다운로드
+    init_args.append("curl http://ywj-horovod.s3.ap-northeast-2.amazonaws.com/horovod/" + username + "/train.py > /horovod/data/train.py")
+
+    if train_data != None:
+        init_args.append("curl http://ywj-horovod.s3.ap-northeast-2.amazonaws.com/{username}/{train_data} > /horovod/data/{train_data}".format(username=username, train_data=train_data))
+
+    if test_data != None:
+        init_args.append("curl http://ywj-horovod.s3.ap-northeast-2.amazonaws.com/{username}/{test_data} > /horovod/data/{test_data}".format(username=username, test_data=test_data))
+
+
+    pod_spec.init_containers[1].args = init_args
+    print(pod_spec.init_containers[1].args)
+
     pod_template_spec.spec = pod_spec
 
     job_spec.template = pod_template_spec
